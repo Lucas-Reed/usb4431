@@ -9,15 +9,14 @@
 <body>
   <header class="app-header">
     <div class="brand">
-      <div class="brand-mark">4431</div>
       <div>
-        <h1>触发后区间平均长漂监测</h1>
-        <p>USB-4431 · AI0–AI3 同步连续采集</p>
+        <h1>USB-4431 区间平均监测</h1>
+        <p>AI0–AI3 同步采集</p>
       </div>
     </div>
     <div class="header-actions">
-      <button id="clearButton" class="button ghost">清空数据</button>
-      <button id="exportButton" class="button ghost">导出全部 CSV</button>
+      <button id="clearButton" class="button ghost">清空</button>
+      <button id="exportButton" class="button ghost">导出 CSV</button>
       <button id="stopButton" class="button danger" disabled>停止采集</button>
       <button id="startButton" class="button primary">开始采集</button>
     </div>
@@ -26,7 +25,7 @@
   <section class="status-ribbon" aria-label="采集状态">
     <div class="status-primary">
       <span id="statusDot" class="status-dot idle"></span>
-      <div><span class="eyebrow">采集状态</span><strong id="acquisitionStatus">待机</strong></div>
+      <div><span>采集状态</span><strong id="acquisitionStatus">待机</strong></div>
     </div>
     <div class="metric"><span>设备</span><strong id="deviceStatus">未连接</strong></div>
     <div class="metric"><span>实际采样率</span><strong id="actualRate">—</strong></div>
@@ -39,7 +38,7 @@
   <main class="workspace">
     <aside class="settings-panel">
       <div class="panel-heading">
-        <div><span class="eyebrow">RUN CONFIGURATION</span><h2>采集参数</h2></div>
+        <div><h2>采集参数</h2></div>
         <span id="lockBadge" class="lock-badge">可编辑</span>
       </div>
 
@@ -95,8 +94,8 @@
       <section class="waveform-section" aria-labelledby="waveformTitle">
         <div class="chart-toolbar waveform-toolbar">
           <div>
-            <span class="eyebrow">LATEST TRIGGER WINDOW</span>
-            <h2 id="waveformTitle">单次触发原始采样</h2>
+            <h2 id="waveformTitle">当前触发窗口</h2>
+            <p>窗口内全部原始采样点</p>
           </div>
           <div class="waveform-meta">
             <span id="waveformEvent">等待触发</span>
@@ -126,8 +125,8 @@
 
       <div class="chart-toolbar">
         <div>
-          <span class="eyebrow">LONG-TERM DRIFT</span>
-          <h2>通道平均值趋势</h2>
+          <h2>区间平均值趋势</h2>
+          <p>每次合法触发生成一个平均值</p>
         </div>
         <div class="toolbar-controls">
           <span id="drawInfo" class="draw-info">绘制 0 / 0 点</span>

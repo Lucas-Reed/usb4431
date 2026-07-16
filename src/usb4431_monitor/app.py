@@ -16,13 +16,13 @@ def main() -> None:
     controller = AppController()
     page = (Path(__file__).parent / "web" / "index.html").resolve().as_uri()
     window = webview.create_window(
-        "USB-4431 触发后区间平均长漂监测",
+        "USB-4431 区间平均监测",
         page,
         js_api=controller,
         width=1500,
         height=960,
         min_size=(1120, 720),
-        background_color="#0a0f14",
+        background_color="#f3f4f6",
     )
 
     def on_closing() -> bool:
@@ -42,4 +42,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

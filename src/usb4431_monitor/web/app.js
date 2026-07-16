@@ -1,4 +1,7 @@
-const COLORS = ['#27d3c2', '#66a7ff', '#f1b44c', '#b795ff'];
+const COLORS = ['#2563eb', '#047857', '#b45309', '#7e22ce'];
+const CHART_TEXT = '#6b7280';
+const CHART_GRID = '#e5e7eb';
+const CHART_EMPTY = '#6b7280';
 const state = {
   records: [],
   xMode: 'event',
@@ -39,6 +42,8 @@ class WaveformChart {
     this.canvas = canvas;
     this.channel = channel;
     this.hoverIndex = null;
+    canvas.tabIndex = 0;
+    canvas.setAttribute('role', 'img');
     this.resizeObserver = new ResizeObserver(() => { state.waveformDirty = true; });
     this.resizeObserver.observe(canvas);
     canvas.addEventListener('pointermove', event => this.onPointerMove(event));
@@ -47,6 +52,21 @@ class WaveformChart {
       this.updateCursor();
       state.waveformDirty = true;
     });
+    canvas.addEventListener('keydown', event => this.onKeyDown(event));
+  }
+
+  onKeyDown(event) {
+    const values = this.values();
+    if (!values.length || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    if (event.key === 'Home') this.hoverIndex = 0;
+    else if (event.key === 'End') this.hoverIndex = values.length - 1;
+    else {
+      const current = this.hoverIndex == null ? 0 : this.hoverIndex;
+      this.hoverIndex = Math.max(0, Math.min(values.length - 1, current + (event.key === 'ArrowRight' ? 1 : -1)));
+    }
+    this.updateCursor();
+    state.waveformDirty = true;
   }
 
   values() {
@@ -113,8 +133,8 @@ class WaveformChart {
     ctx.clearRect(0, 0, width, height);
     ctx.lineWidth = 1;
     ctx.font = '9px ui-monospace, Consolas, monospace';
-    ctx.fillStyle = '#718292';
-    ctx.strokeStyle = '#1c2a35';
+    ctx.fillStyle = CHART_TEXT;
+    ctx.strokeStyle = CHART_GRID;
     for (let index = 0; index <= 3; index++) {
       const y = plot.top + index * (plot.bottom - plot.top) / 3;
       ctx.beginPath(); ctx.moveTo(plot.left, y); ctx.lineTo(plot.right, y); ctx.stroke();
@@ -129,7 +149,7 @@ class WaveformChart {
     }
 
     if (!values.length || !waveform) {
-      ctx.fillStyle = '#566776'; ctx.font = '11px Segoe UI, sans-serif'; ctx.textAlign = 'center';
+      ctx.fillStyle = CHART_EMPTY; ctx.font = '11px Segoe UI, sans-serif'; ctx.textAlign = 'center';
       ctx.fillText('等待触发窗口采样', (plot.left + plot.right) / 2, (plot.top + plot.bottom) / 2);
       ctx.textAlign = 'start';
       return;
@@ -147,7 +167,7 @@ class WaveformChart {
       const timeMs = waveform.first_sample_offset_ms + this.hoverIndex / waveform.sample_rate_Hz * 1000;
       const x = px(timeMs), y = py(Number(values[this.hoverIndex]));
       ctx.beginPath(); ctx.moveTo(x, plot.top); ctx.lineTo(x, plot.bottom);
-      ctx.strokeStyle = 'rgba(225,235,242,.35)'; ctx.lineWidth = 1; ctx.stroke();
+      ctx.strokeStyle = 'rgba(75, 85, 99, .45)'; ctx.lineWidth = 1; ctx.stroke();
       ctx.beginPath(); ctx.arc(x, y, 3.2, 0, Math.PI * 2); ctx.fillStyle = COLORS[this.channel]; ctx.fill();
     }
   }
@@ -246,8 +266,8 @@ class DriftChart {
     ctx.clearRect(0, 0, width, height);
     ctx.lineWidth = 1;
     ctx.font = '10px ui-monospace, Consolas, monospace';
-    ctx.fillStyle = '#718292';
-    ctx.strokeStyle = '#1c2a35';
+    ctx.fillStyle = CHART_TEXT;
+    ctx.strokeStyle = CHART_GRID;
     for (let i = 0; i <= 4; i++) {
       const y = plot.top + i * (plot.bottom - plot.top) / 4;
       ctx.beginPath(); ctx.moveTo(plot.left, y); ctx.lineTo(plot.right, y); ctx.stroke();
@@ -264,7 +284,7 @@ class DriftChart {
     }
 
     if (!visible.length) {
-      ctx.fillStyle = '#566776'; ctx.font = '12px Segoe UI, sans-serif';
+      ctx.fillStyle = CHART_EMPTY; ctx.font = '12px Segoe UI, sans-serif';
       ctx.textAlign = 'center'; ctx.fillText('等待触发结果', (plot.left + plot.right) / 2, (plot.top + plot.bottom) / 2); ctx.textAlign = 'start';
       return;
     }
@@ -369,6 +389,9 @@ function renderState(info) {
   $('#runMessage').textContent = info.unfinished_windows ? `${info.message}；${info.unfinished_windows} 个窗口未完成。` : info.message;
   $('#statusDot').className = `status-dot ${info.status}`;
   setLocked(info.config_locked);
+  $('#startButton').textContent = info.status === 'starting' ? '启动中…' : '开始采集';
+  $('#stopButton').textContent = info.status === 'draining' ? '正在停止…' : '停止采集';
+  if (info.status === 'draining') $('#stopButton').disabled = true;
   info.summaries.forEach((summary, channel) => {
     const card = $(`.chart-card[data-channel="${channel}"]`);
     $('[data-stat="latest"]', card).textContent = formatVoltage(summary.latest);
