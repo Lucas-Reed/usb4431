@@ -80,7 +80,10 @@ class NIDaqSource(SampleSource):
             from nidaqmx.constants import AcquisitionType, Coupling
             from nidaqmx.stream_readers import AnalogMultiChannelReader
         except ImportError as exc:
-            raise RuntimeError("未安装 NI-DAQmx Python 支持，请安装项目依赖和 NI-DAQmx 驱动") from exc
+            raise RuntimeError(
+                "NI-DAQmx Python 支持加载失败。请确认程序文件完整且已安装 NI-DAQmx 驱动。"
+                f"原始错误：{exc.__class__.__name__}: {exc}"
+            ) from exc
 
         last_error: Exception | None = None
         for attempt in range(3):

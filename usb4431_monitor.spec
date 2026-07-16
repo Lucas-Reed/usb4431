@@ -1,14 +1,15 @@
 # -*- mode: python ; coding: utf-8 -*-
-from PyInstaller.utils.hooks import collect_submodules
+from PyInstaller.utils.hooks import collect_submodules, copy_metadata
 
 
 hiddenimports = collect_submodules("nidaqmx")
+nidaqmx_metadata = copy_metadata("nidaqmx") + copy_metadata("nitypes")
 
 a = Analysis(
     ["run_usb4431.py"],
     pathex=["src"],
     binaries=[],
-    datas=[("src/usb4431_monitor/web", "usb4431_monitor/web")],
+    datas=[("src/usb4431_monitor/web", "usb4431_monitor/web"), *nidaqmx_metadata],
     hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
@@ -41,4 +42,3 @@ coll = COLLECT(
     upx_exclude=[],
     name="USB4431-LongDrift",
 )
-

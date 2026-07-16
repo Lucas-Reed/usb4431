@@ -58,6 +58,12 @@ python -m pytest --basetemp tests/.tmp -p no:cacheprovider
 
 输出位于 `dist/USB4431-LongDrift/USB4431-LongDrift.exe`。硬件模式运行前，目标电脑仍需安装与设备兼容的 NI-DAQmx 驱动。
 
+发布验证可调用隐藏的硬件自检入口，它会短暂读取 Dev1 的 AI0–AI3 并将结果写入指定文件：
+
+```powershell
+USB4431-LongDrift.exe --hardware-self-test hardware-check.txt
+```
+
 ## 平均窗口定义
 
 设触发样本序号为 `t`，实际采样率为 `fs`，窗口为 `(start, end]`，则：
