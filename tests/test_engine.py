@@ -106,3 +106,34 @@ def test_all_channels_use_identical_sample_count_and_range():
     assert result["ai2_mean_V"] == pytest.approx(-97.0)
     assert result["ai3_mean_V"] == pytest.approx(2.0)
 
+
+def test_latest_waveform_contains_every_window_sample_for_all_channels():
+    engine = processor(end=0.003)
+    engine.process(block(range(6), [0, 5, 0, 0, 0, 0]))
+    waveform = engine.latest_waveform
+    assert waveform is not None
+    assert waveform["complete"] is True
+    assert waveform["collected_count"] == waveform["expected_count"] == 3
+    assert waveform["first_sample_offset_ms"] == pytest.approx(1.0)
+    assert waveform["channels"] == [
+        [2.0, 3.0, 4.0],
+        [102.0, 103.0, 104.0],
+        [-98.0, -97.0, -96.0],
+        [0.0, 0.0, 0.0],
+    ]
+
+
+def test_waveform_grows_across_blocks_and_switches_to_newest_trigger():
+    engine = processor(end=0.004)
+    engine.process(block(range(3), [0, 5, 0]))
+    first_revision = engine.waveform_revision
+    assert engine.latest_waveform["channels"][0] == [2.0]
+    assert engine.latest_waveform["complete"] is False
+
+    engine.process(block(range(3, 5), [0, 0]))
+    assert engine.waveform_revision > first_revision
+    assert engine.latest_waveform["channels"][0] == [2.0, 3.0, 4.0]
+
+    engine.process(block(range(5, 10), [0, 5, 0, 0, 0]))
+    assert engine.latest_waveform["event_index"] == 2
+    assert engine.latest_waveform["channels"][0] == [7.0, 8.0, 9.0]

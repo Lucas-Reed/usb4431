@@ -72,6 +72,17 @@ input:disabled, select:disabled { opacity: .5; cursor: not-allowed; }
 .run-message { margin-top: 20px; padding: 10px 11px; border-left: 2px solid #315568; background: #0a121a; color: #7890a2; font-size: 11px; line-height: 1.45; }
 .dashboard { min-width: 0; padding: 22px 28px 30px; }
 .chart-toolbar { min-height: 44px; margin-bottom: 14px; }
+.waveform-section { margin-bottom: 26px; }
+.waveform-toolbar { min-height: 48px; }
+.waveform-meta { display: flex; align-items: center; gap: 9px; color: var(--muted); font: 11px/1 ui-monospace, Consolas, monospace; }
+.waveform-meta > span { padding: 7px 9px; border: 1px solid var(--line); border-radius: 5px; background: #0a1219; }
+.waveform-state.collecting { color: var(--amber); border-color: rgba(241,180,76,.35); background: rgba(241,180,76,.06); }
+.waveform-state.complete { color: var(--cyan); border-color: rgba(39,211,194,.35); background: rgba(39,211,194,.06); }
+.waveform-grid { display: grid; grid-template-columns: repeat(2, minmax(360px, 1fr)); gap: 10px; }
+.waveform-card { min-width: 0; border: 1px solid var(--line); border-radius: 8px; background: linear-gradient(180deg, rgba(15,24,33,.96), rgba(10,17,24,.96)); overflow: hidden; }
+.waveform-head { height: 38px; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; border-bottom: 1px solid var(--line-soft); }
+.waveform-head strong { color: #8193a2; font: 500 10px/1 ui-monospace, Consolas, monospace; font-variant-numeric: tabular-nums; }
+.waveform-card canvas { height: 150px; }
 .toolbar-controls { display: flex; align-items: center; gap: 14px; color: var(--muted); font-size: 11px; }
 .toolbar-controls label { display: flex; align-items: center; gap: 7px; }
 .toolbar-controls select { width: 112px; height: 31px; }
@@ -102,4 +113,3 @@ canvas { display: block; width: 100%; height: 236px; cursor: crosshair; }
 .toast.show { opacity: 1; transform: translateY(0); }
 .toast.error { border-color: #63393d; background: #271518; color: #ffc4c7; }
 @media (max-width: 1250px) { .status-ribbon { padding: 0 18px; } .metric { padding: 0 10px; } .settings-panel { padding-left: 20px; } .dashboard { padding-right: 20px; padding-left: 20px; } }
-

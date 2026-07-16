@@ -92,6 +92,38 @@
     </aside>
 
     <section class="dashboard">
+      <section class="waveform-section" aria-labelledby="waveformTitle">
+        <div class="chart-toolbar waveform-toolbar">
+          <div>
+            <span class="eyebrow">LATEST TRIGGER WINDOW</span>
+            <h2 id="waveformTitle">单次触发原始采样</h2>
+          </div>
+          <div class="waveform-meta">
+            <span id="waveformEvent">等待触发</span>
+            <span id="waveformProgress">0 / 0 点</span>
+            <span id="waveformState" class="waveform-state">—</span>
+          </div>
+        </div>
+        <div class="waveform-grid">
+          <article class="waveform-card" data-wave-channel="0">
+            <div class="waveform-head"><span class="channel-tag c0">AI0</span><strong data-wave-stat="cursor">移动鼠标查看采样点</strong></div>
+            <canvas id="waveform0" aria-label="AI0 当前触发窗口原始采样波形"></canvas>
+          </article>
+          <article class="waveform-card" data-wave-channel="1">
+            <div class="waveform-head"><span class="channel-tag c1">AI1</span><strong data-wave-stat="cursor">移动鼠标查看采样点</strong></div>
+            <canvas id="waveform1" aria-label="AI1 当前触发窗口原始采样波形"></canvas>
+          </article>
+          <article class="waveform-card" data-wave-channel="2">
+            <div class="waveform-head"><span class="channel-tag c2">AI2</span><strong data-wave-stat="cursor">移动鼠标查看采样点</strong></div>
+            <canvas id="waveform2" aria-label="AI2 当前触发窗口原始采样波形"></canvas>
+          </article>
+          <article class="waveform-card" data-wave-channel="3">
+            <div class="waveform-head"><span class="channel-tag c3">AI3</span><strong data-wave-stat="cursor">移动鼠标查看采样点</strong></div>
+            <canvas id="waveform3" aria-label="AI3 当前触发窗口原始采样波形"></canvas>
+          </article>
+        </div>
+      </section>
+
       <div class="chart-toolbar">
         <div>
           <span class="eyebrow">LONG-TERM DRIFT</span>
@@ -137,4 +169,3 @@
   <script src="app.js"></script>
 </body>
 </html>
-

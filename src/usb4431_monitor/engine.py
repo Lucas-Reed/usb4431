@@ -17,6 +17,7 @@ class PendingWindow:
     trigger_timestamp: str
     sums: np.ndarray = field(default_factory=lambda: np.zeros(4, dtype=np.float64))
     count: int = 0
+    raw_chunks: list[np.ndarray] = field(default_factory=list)
 
 
 class TriggerWindowProcessor:
@@ -42,6 +43,10 @@ class TriggerWindowProcessor:
         self._armed = False
         self._previous_trigger_value = 0.0
         self._last_trigger_index: int | None = None
+        self._display_event_index: int | None = None
+        self.latest_waveform: dict | None = None
+        self.waveform_revision = 0
+        self._published_waveform_key: tuple[int, int, bool] | None = None
 
     @property
     def expected_sample_count(self) -> int:
@@ -73,6 +78,13 @@ class TriggerWindowProcessor:
         for window in new_windows:
             self._accumulate(window, data, block_start, block_end)
             self.pending.append(window)
+
+        display_window = next(
+            (window for window in reversed(self.pending) if window.event_index == self._display_event_index),
+            None,
+        )
+        if display_window is not None:
+            self._publish_waveform(display_window, block_end >= display_window.last_index)
 
         self.next_sample_index = block_end + 1
         completed: list[dict] = []
@@ -124,6 +136,7 @@ class TriggerWindowProcessor:
                 )
                 self.next_event_index += 1
                 self._last_trigger_index = index
+                self._display_event_index = windows[-1].event_index
                 self._armed = False
 
             self._previous_trigger_value = value
@@ -139,6 +152,33 @@ class TriggerWindowProcessor:
         local_stop = overlap_end - block_start + 1
         window.sums += np.sum(data[:, local_start:local_stop], axis=1, dtype=np.float64)
         window.count += local_stop - local_start
+        window.raw_chunks.append(data[:, local_start:local_stop].copy())
+
+    def _publish_waveform(self, window: PendingWindow, completed: bool) -> None:
+        publish_key = (window.event_index, window.count, completed)
+        if publish_key == self._published_waveform_key:
+            return
+        if window.raw_chunks:
+            samples = np.concatenate(window.raw_chunks, axis=1)
+        else:
+            samples = np.empty((4, 0), dtype=np.float64)
+        self.waveform_revision += 1
+        self._published_waveform_key = publish_key
+        self.latest_waveform = {
+            "revision": self.waveform_revision,
+            "event_index": window.event_index,
+            "acquisition_run": self.acquisition_run,
+            "trigger_timestamp": window.trigger_timestamp,
+            "trigger_sample_index": window.trigger_index,
+            "sample_rate_Hz": self.sample_rate_hz,
+            "window_start_ms": self.config.window_start_s * 1000.0,
+            "window_end_ms": self.config.window_end_s * 1000.0,
+            "first_sample_offset_ms": (window.first_index - window.trigger_index) / self.sample_rate_hz * 1000.0,
+            "expected_count": self.expected_sample_count,
+            "collected_count": window.count,
+            "complete": completed,
+            "channels": [samples[channel].tolist() for channel in range(4)],
+        }
 
     def _finish(self, window: PendingWindow) -> dict:
         if window.count <= 0:
@@ -159,4 +199,3 @@ class TriggerWindowProcessor:
             "sample_count": window.count,
             "run_time_s": window.trigger_index / self.sample_rate_hz,
         }
-

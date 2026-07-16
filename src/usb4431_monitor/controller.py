@@ -24,6 +24,9 @@ class AppController:
         self._listener: threading.Thread | None = None
         self._records: list[dict] = []
         self._exported_count = 0
+        self._waveform: dict | None = None
+        self._waveform_revision = 0
+        self._run_event_offset = 0
         self._state = {
             "status": "idle",
             "device_status": "未连接",
@@ -94,6 +97,9 @@ class AppController:
                     "window_end_ms": config.window_end_s * 1000.0,
                 }
             )
+            self._waveform = None
+            self._waveform_revision += 1
+            self._run_event_offset = len(self._records)
             self._process.start()
 
         deadline = time.monotonic() + 8.0
@@ -143,6 +149,16 @@ class AppController:
                 "records": selected,
             }
 
+    def get_waveform_data(self, since_revision: int = -1) -> dict:
+        with self._lock:
+            if int(since_revision) == self._waveform_revision:
+                return {"changed": False, "revision": self._waveform_revision}
+            return {
+                "changed": True,
+                "revision": self._waveform_revision,
+                "waveform": self._waveform,
+            }
+
     def clear_data(self, force: bool = False) -> dict:
         with self._lock:
             if self._state["status"] in {"starting", "running", "draining"}:
@@ -151,6 +167,8 @@ class AppController:
                 return {"ok": False, "confirm_required": True}
             self._records.clear()
             self._exported_count = 0
+            self._waveform = None
+            self._waveform_revision += 1
             self._summaries = [self._empty_summary() for _ in range(4)]
             self._state.update({"completed_count": 0, "message": "数据已清空"})
             return {"ok": True}
@@ -271,6 +289,19 @@ class AppController:
                         "pending_count": event.get("pending", 0),
                     }
                 )
+            elif kind == "waveform":
+                packet = dict(event.get("waveform") or {})
+                if packet:
+                    packet["event_index"] = self._run_event_offset + int(packet["event_index"])
+                    chunks = packet.pop("channels", [[], [], [], []])
+                    reset = bool(packet.pop("reset", False))
+                    if reset or self._waveform is None or self._waveform.get("event_index") != packet["event_index"]:
+                        self._waveform = {**packet, "channels": [list(chunk) for chunk in chunks]}
+                    else:
+                        for channel, chunk in enumerate(chunks):
+                            self._waveform["channels"][channel].extend(chunk)
+                        self._waveform.update(packet)
+                    self._waveform_revision += 1
             elif kind == "progress":
                 self._state.update(
                     {
