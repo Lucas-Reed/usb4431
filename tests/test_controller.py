@@ -1,10 +1,12 @@
 import time
 
+import pytest
+
 from usb4431_monitor.controller import AppController
 
 
-def test_simulation_process_starts_produces_results_and_drains():
-    controller = AppController()
+def test_simulation_process_starts_produces_results_and_drains(tmp_path):
+    controller = AppController(tmp_path / "settings.json")
     result = controller.start(
         {
             "mode": "simulation",
@@ -38,3 +40,23 @@ def test_simulation_process_starts_produces_results_and_drains():
     assert controller.get_state()["status"] == "idle"
     assert controller.get_state()["pending_count"] == 0
     controller.shutdown()
+
+
+def test_controller_saves_and_loads_default_config(tmp_path):
+    path = tmp_path / "settings.json"
+    controller = AppController(path)
+    raw = {
+        "mode": "simulation",
+        "sample_rate_hz": 20_000,
+        "window_unit": "ms",
+        "window_start": 10,
+        "window_end": 80,
+    }
+    saved = controller.save_default_config(raw)
+    assert saved["ok"] is True
+
+    reloaded = AppController(path).get_default_config()
+    assert reloaded["ok"] is True
+    assert reloaded["config"]["sample_rate_hz"] == 20_000
+    assert reloaded["config"]["window_start"] == pytest.approx(10)
+    assert reloaded["config"]["window_end"] == pytest.approx(80)

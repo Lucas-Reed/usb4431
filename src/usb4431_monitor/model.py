@@ -69,6 +69,25 @@ class AcquisitionConfig:
     def to_dict(self) -> dict:
         return asdict(self)
 
+    def to_ui(self, window_unit: str = "ms") -> dict:
+        if window_unit not in {"ms", "s"}:
+            window_unit = "ms"
+        window_scale = 1000.0 if window_unit == "ms" else 1.0
+        return {
+            "mode": self.mode,
+            "device": self.device,
+            "trigger_channel": self.trigger_channel,
+            "trigger_threshold_v": self.trigger_threshold_v,
+            "trigger_hysteresis_v": self.trigger_hysteresis_v,
+            "min_trigger_interval_ms": self.min_trigger_interval_s * 1000.0,
+            "sample_rate_hz": self.requested_sample_rate_hz,
+            "window_unit": window_unit,
+            "window_start": self.window_start_s * window_scale,
+            "window_end": self.window_end_s * window_scale,
+            "simulation_trigger_period_ms": self.simulation_trigger_period_s * 1000.0,
+            "simulation_realtime": self.simulation_realtime,
+        }
+
 
 def window_bounds(trigger_index: int, sample_rate_hz: float, start_s: float, end_s: float) -> tuple[int, int]:
     """Return inclusive sample bounds for the interval ``(start, end]``.
@@ -83,4 +102,3 @@ def window_bounds(trigger_index: int, sample_rate_hz: float, start_s: float, end
 def window_sample_count(sample_rate_hz: float, start_s: float, end_s: float) -> int:
     first, last = window_bounds(0, sample_rate_hz, start_s, end_s)
     return max(0, last - first + 1)
-

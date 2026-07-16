@@ -368,13 +368,63 @@ function collectConfig() {
   };
 }
 
+function applyConfig(config) {
+  const mode = config.mode === 'hardware' ? 'hardware' : 'simulation';
+  const modeInput = $(`input[name="mode"][value="${mode}"]`);
+  if (modeInput) modeInput.checked = true;
+  $('#device').value = config.device ?? 'Dev1';
+  $('#triggerChannel').value = String(config.trigger_channel ?? 0);
+  $('#threshold').value = config.trigger_threshold_v ?? 2.5;
+  $('#hysteresis').value = config.trigger_hysteresis_v ?? 0.2;
+  $('#minInterval').value = config.min_trigger_interval_ms ?? 100;
+  $('#sampleRate').value = config.sample_rate_hz ?? 10000;
+  $('#windowUnit').value = config.window_unit === 's' ? 's' : 'ms';
+  $('#windowStart').value = config.window_start ?? 0;
+  $('#windowEnd').value = config.window_end ?? 100;
+  $('#windowStart').step = config.window_unit === 's' ? '.001' : '1';
+  $('#windowEnd').step = config.window_unit === 's' ? '.001' : '1';
+  $('#simulationPeriod').value = config.simulation_trigger_period_ms ?? 250;
+  $('#simulationRealtime').checked = config.simulation_realtime !== false;
+  updateModeControls();
+}
+
+function updateModeControls() {
+  const simulation = $('input[name="mode"]:checked').value === 'simulation';
+  $('#simulationOptions').style.display = simulation ? '' : 'none';
+  $('#device').disabled = simulation || state.locked;
+  $('#refreshDevices').disabled = simulation || state.locked;
+  $('#modeHint').textContent = simulation
+    ? '生成慢漂、噪声及 12 ms 触发脉冲。'
+    : '四路默认 DC 耦合、±10 V，IEPE 关闭。';
+}
+
+async function loadDefaultConfig() {
+  const result = await api().get_default_config();
+  if (result.ok) applyConfig(result.config);
+  if (result.warning) toast(result.warning, true);
+}
+
+async function saveDefaultConfig() {
+  const button = $('#saveDefaultsButton');
+  button.disabled = true;
+  button.textContent = '保存中…';
+  const result = await api().save_default_config(collectConfig());
+  button.textContent = '保存为默认';
+  button.disabled = state.locked;
+  if (result.ok) toast('当前参数已保存，程序下次启动时自动加载');
+  else toast(result.error, true);
+  await refresh();
+}
+
 function setLocked(locked) {
   state.locked = locked;
   $$('#configForm input, #configForm select, #configForm button').forEach(node => node.disabled = locked);
   $('#startButton').disabled = locked;
   $('#stopButton').disabled = !locked;
+  $('#saveDefaultsButton').disabled = locked;
   $('#lockBadge').textContent = locked ? '参数已锁定' : '可编辑';
   $('#lockBadge').classList.toggle('locked', locked);
+  updateModeControls();
 }
 
 function renderState(info) {
@@ -479,6 +529,7 @@ $('#startButton').addEventListener('click', startAcquisition);
 $('#stopButton').addEventListener('click', stopAcquisition);
 $('#exportButton').addEventListener('click', exportAll);
 $('#clearButton').addEventListener('click', clearData);
+$('#saveDefaultsButton').addEventListener('click', saveDefaultConfig);
 $('#xAxisMode').addEventListener('change', event => { state.xMode = event.target.value; charts.forEach(chart => chart.reset()); });
 $('#windowUnit').addEventListener('change', event => {
   const toSeconds = event.target.value === 's';
@@ -488,21 +539,16 @@ $('#windowUnit').addEventListener('change', event => {
   $('#windowStart').step = toSeconds ? '.001' : '1';
   $('#windowEnd').step = toSeconds ? '.001' : '1';
 });
-$$('input[name="mode"]').forEach(input => input.addEventListener('change', () => {
-  const simulation = $('input[name="mode"]:checked').value === 'simulation';
-  $('#simulationOptions').style.display = simulation ? '' : 'none';
-  $('#device').disabled = simulation || state.locked;
-  $('#refreshDevices').disabled = simulation || state.locked;
-  $('#modeHint').textContent = simulation ? '生成慢漂、噪声及 12 ms 触发脉冲。' : '四路默认 DC 耦合、±10 V，IEPE 关闭。';
-}));
+$$('input[name="mode"]').forEach(input => input.addEventListener('change', updateModeControls));
 $('#refreshDevices').addEventListener('click', async () => {
   const result = await api().list_devices();
   if (result.ok && result.devices.length) { $('#device').value = result.devices[0]; toast(`检测到 ${result.devices.join('、')}`); }
   else toast(result.error || '未检测到 NI 设备', true);
 });
 
-window.addEventListener('pywebviewready', () => {
-  refresh();
+window.addEventListener('pywebviewready', async () => {
+  await loadDefaultConfig();
+  await refresh();
   state.waveformPolling = true;
   pollWaveform();
   setInterval(refresh, 400);

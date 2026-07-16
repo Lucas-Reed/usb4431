@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import os
 import time
 from abc import ABC, abstractmethod
+from uuid import uuid4
 
 import numpy as np
 
@@ -80,36 +82,52 @@ class NIDaqSource(SampleSource):
         except ImportError as exc:
             raise RuntimeError("未安装 NI-DAQmx Python 支持，请安装项目依赖和 NI-DAQmx 驱动") from exc
 
-        task = nidaqmx.Task("USB4431_LongDrift")
-        try:
-            for index in range(4):
-                channel = task.ai_channels.add_ai_voltage_chan(
-                    f"{self.config.device}/ai{index}",
-                    min_val=-10.0,
-                    max_val=10.0,
-                )
-                try:
-                    channel.ai_coupling = Coupling.DC
-                except Exception:
-                    pass
-                # USB-4431 IEPE excitation is disabled for voltage inputs when supported.
-                try:
-                    channel.ai_excit_enable = False
-                except Exception:
-                    pass
+        last_error: Exception | None = None
+        for attempt in range(3):
+            task_name = f"USB4431_LongDrift_{os.getpid()}_{uuid4().hex[:8]}"
+            task = nidaqmx.Task(task_name)
+            try:
+                for index in range(4):
+                    channel = task.ai_channels.add_ai_voltage_chan(
+                        f"{self.config.device}/ai{index}",
+                        min_val=-10.0,
+                        max_val=10.0,
+                    )
+                    try:
+                        channel.ai_coupling = Coupling.DC
+                    except Exception:
+                        pass
+                    # USB-4431 IEPE excitation is disabled for voltage inputs when supported.
+                    try:
+                        channel.ai_excit_enable = False
+                    except Exception:
+                        pass
 
-            task.timing.cfg_samp_clk_timing(
-                rate=self.config.requested_sample_rate_hz,
-                sample_mode=AcquisitionType.CONTINUOUS,
-                samps_per_chan=max(self.block_size * 8, int(self.config.requested_sample_rate_hz)),
-            )
-            self.actual_sample_rate_hz = float(task.timing.samp_clk_rate)
-            self._reader = AnalogMultiChannelReader(task.in_stream)
-            task.start()
-            self._task = task
-        except Exception:
-            task.close()
-            raise
+                task.timing.cfg_samp_clk_timing(
+                    rate=self.config.requested_sample_rate_hz,
+                    sample_mode=AcquisitionType.CONTINUOUS,
+                    samps_per_chan=max(self.block_size * 8, int(self.config.requested_sample_rate_hz)),
+                )
+                self.actual_sample_rate_hz = float(task.timing.samp_clk_rate)
+                self._reader = AnalogMultiChannelReader(task.in_stream)
+                task.start()
+                self._task = task
+                return
+            except Exception as exc:
+                last_error = exc
+                task.close()
+                self._reader = None
+                if is_resource_reserved_error(exc) and attempt < 2:
+                    time.sleep(0.5)
+                    continue
+                if is_resource_reserved_error(exc):
+                    raise RuntimeError(
+                        "USB-4431 仍被其他采集任务占用（NI-DAQmx -50103）。"
+                        "程序已自动重试 3 次；请停止其他使用该设备的程序或 NI MAX 测试面板后重试。"
+                    ) from exc
+                raise
+        if last_error is not None:
+            raise last_error
 
     def read(self) -> np.ndarray:
         if self._reader is None:
@@ -136,3 +154,6 @@ def create_source(config: AcquisitionConfig) -> SampleSource:
         return NIDaqSource(config)
     return SimulationSource(config)
 
+
+def is_resource_reserved_error(error: BaseException) -> bool:
+    return getattr(error, "error_code", None) == -50103 or "-50103" in str(error)

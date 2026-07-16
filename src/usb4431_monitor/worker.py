@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import multiprocessing as mp
 import queue
 import time
 import traceback
@@ -16,6 +17,8 @@ def acquisition_worker(config_data: dict, command_queue: Queue, event_queue: Que
     source = create_source(config)
     processor: TriggerWindowProcessor | None = None
     stop_requested = False
+    parent = mp.parent_process()
+    parent_gone = False
     try:
         source.open()
         started_at = datetime.now().astimezone()
@@ -35,12 +38,18 @@ def acquisition_worker(config_data: dict, command_queue: Queue, event_queue: Que
         last_waveform_count = 0
         next_waveform_emit = 0.0
         while True:
+            if not _parent_is_alive(parent):
+                parent_gone = True
+                break
             stop_requested = _consume_commands(command_queue, event_queue, processor, stop_requested)
 
             if stop_requested and not processor.pending:
                 break
 
             block = source.read()
+            if not _parent_is_alive(parent):
+                parent_gone = True
+                break
             # Catch a stop request that arrived while a hardware read was blocked.
             stop_requested = _consume_commands(command_queue, event_queue, processor, stop_requested)
             results = processor.process(block)
@@ -72,21 +81,24 @@ def acquisition_worker(config_data: dict, command_queue: Queue, event_queue: Que
                 )
                 last_status = now
 
-        event_queue.put({"type": "stopped", "pending": 0})
+        if not parent_gone:
+            event_queue.put({"type": "stopped", "pending": 0})
     except Exception as exc:
-        event_queue.put(
-            {
-                "type": "error",
-                "message": str(exc) or exc.__class__.__name__,
-                "unfinished_windows": len(processor.pending) if processor else 0,
-                "details": traceback.format_exc(limit=8),
-            }
-        )
+        if _parent_is_alive(parent):
+            event_queue.put(
+                {
+                    "type": "error",
+                    "message": str(exc) or exc.__class__.__name__,
+                    "unfinished_windows": len(processor.pending) if processor else 0,
+                    "details": traceback.format_exc(limit=8),
+                }
+            )
     finally:
         try:
             source.close()
         except Exception as close_exc:
-            event_queue.put({"type": "warning", "message": f"关闭设备时发生错误：{close_exc}"})
+            if _parent_is_alive(parent):
+                event_queue.put({"type": "warning", "message": f"关闭设备时发生错误：{close_exc}"})
 
 
 def _consume_commands(command_queue: Queue, event_queue: Queue, processor: TriggerWindowProcessor, stopped: bool) -> bool:
@@ -99,3 +111,12 @@ def _consume_commands(command_queue: Queue, event_queue: Queue, processor: Trigg
                 event_queue.put({"type": "draining", "pending": len(processor.pending)})
     except queue.Empty:
         return stopped
+
+
+def _parent_is_alive(parent: object | None) -> bool:
+    if parent is None:
+        return True
+    try:
+        return bool(parent.is_alive())
+    except (OSError, ValueError):
+        return False

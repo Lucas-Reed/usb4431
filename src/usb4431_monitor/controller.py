@@ -10,13 +10,14 @@ from uuid import uuid4
 
 from .csv_export import export_all, export_channel
 from .model import AcquisitionConfig
+from .settings import SettingsStore
 from .worker import acquisition_worker
 
 
 class AppController:
     PLOT_LIMIT = 5_000
 
-    def __init__(self) -> None:
+    def __init__(self, settings_path: str | Path | None = None) -> None:
         self._lock = threading.RLock()
         self._process: mp.Process | None = None
         self._commands = None
@@ -27,6 +28,7 @@ class AppController:
         self._waveform: dict | None = None
         self._waveform_revision = 0
         self._run_event_offset = 0
+        self._settings = SettingsStore(settings_path)
         self._state = {
             "status": "idle",
             "device_status": "未连接",
@@ -58,6 +60,22 @@ class AppController:
                 "summaries": [dict(item) for item in self._summaries],
                 "config_locked": self._state["status"] in {"starting", "running", "draining"},
             }
+
+    def get_default_config(self) -> dict:
+        config, warning = self._settings.load()
+        return {"ok": True, "config": config, "warning": warning}
+
+    def save_default_config(self, raw_config: dict) -> dict:
+        with self._lock:
+            if self._state["status"] in {"starting", "running", "draining"}:
+                return {"ok": False, "error": "请先停止采集，再保存默认参数"}
+        try:
+            normalized = self._settings.save(raw_config)
+        except (OSError, TypeError, ValueError) as exc:
+            return {"ok": False, "error": f"默认参数保存失败：{exc}"}
+        with self._lock:
+            self._state["message"] = "当前参数已保存为默认值"
+        return {"ok": True, "config": normalized}
 
     def start(self, raw_config: dict) -> dict:
         try:

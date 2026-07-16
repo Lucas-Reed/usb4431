@@ -120,6 +120,11 @@ h1, h2, h3, p { margin: 0; }
 .panel-heading { min-height: 30px; }
 .panel-heading h2, .chart-toolbar h2 { font-size: 15px; font-weight: 600; }
 .chart-toolbar p { margin-top: 2px; color: var(--text-muted); font-size: 12px; }
+.panel-heading-actions { display: flex; align-items: center; gap: 6px; }
+.settings-action { min-height: 28px; padding: 0 8px; border: 1px solid var(--border); border-radius: var(--control-radius); background: var(--surface); color: var(--text-secondary); font-size: 12px; }
+.settings-action:hover:not(:disabled) { border-color: #9ca3af; background: var(--surface-active); }
+.settings-action:focus-visible { outline: none; border-color: var(--primary); box-shadow: var(--focus); }
+.settings-action:disabled { opacity: .45; }
 
 .lock-badge {
   padding: 3px 7px;
