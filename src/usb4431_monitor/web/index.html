@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>USB-4431 长漂监测</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">
+      <div class="brand-mark">4431</div>
+      <div>
+        <h1>触发后区间平均长漂监测</h1>
+        <p>USB-4431 · AI0–AI3 同步连续采集</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button id="clearButton" class="button ghost">清空数据</button>
+      <button id="exportButton" class="button ghost">导出全部 CSV</button>
+      <button id="stopButton" class="button danger" disabled>停止采集</button>
+      <button id="startButton" class="button primary">开始采集</button>
+    </div>
+  </header>
+
+  <section class="status-ribbon" aria-label="采集状态">
+    <div class="status-primary">
+      <span id="statusDot" class="status-dot idle"></span>
+      <div><span class="eyebrow">采集状态</span><strong id="acquisitionStatus">待机</strong></div>
+    </div>
+    <div class="metric"><span>设备</span><strong id="deviceStatus">未连接</strong></div>
+    <div class="metric"><span>实际采样率</span><strong id="actualRate">—</strong></div>
+    <div class="metric"><span>平均区间</span><strong id="windowRange">—</strong></div>
+    <div class="metric"><span>窗口样本数</span><strong id="sampleCount">—</strong></div>
+    <div class="metric accent"><span>已完成触发</span><strong id="completedCount">0</strong></div>
+    <div class="metric"><span>待完成窗口</span><strong id="pendingCount">0</strong></div>
+  </section>
+
+  <main class="workspace">
+    <aside class="settings-panel">
+      <div class="panel-heading">
+        <div><span class="eyebrow">RUN CONFIGURATION</span><h2>采集参数</h2></div>
+        <span id="lockBadge" class="lock-badge">可编辑</span>
+      </div>
+
+      <form id="configForm">
+        <fieldset>
+          <legend>数据源</legend>
+          <div class="segmented" role="radiogroup" aria-label="数据源模式">
+            <label><input type="radio" name="mode" value="simulation" checked><span>模拟模式</span></label>
+            <label><input type="radio" name="mode" value="hardware"><span>USB-4431</span></label>
+          </div>
+          <label class="field-label" for="device">NI 设备名</label>
+          <div class="inline-field">
+            <input id="device" value="Dev1" autocomplete="off">
+            <button id="refreshDevices" class="icon-button" type="button" title="刷新设备">刷新</button>
+          </div>
+          <p id="modeHint" class="field-hint">生成慢漂、噪声及 12 ms 触发脉冲。</p>
+        </fieldset>
+
+        <fieldset>
+          <legend>触发</legend>
+          <div class="field-grid two">
+            <label><span>触发通道</span><select id="triggerChannel"><option value="0">AI0</option><option value="1">AI1</option><option value="2">AI2</option><option value="3">AI3</option></select></label>
+            <label><span>阈值 / V</span><input id="threshold" type="number" value="2.5" step="0.1"></label>
+            <label><span>回差 / V</span><input id="hysteresis" type="number" value="0.2" min="0" step="0.05"></label>
+            <label><span>最小间隔 / ms</span><input id="minInterval" type="number" value="100" min="0" step="1"></label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>采样与平均窗口</legend>
+          <label class="field-label" for="sampleRate">采样率 / S/s</label>
+          <input id="sampleRate" type="number" value="10000" min="1000" max="102400" step="100">
+          <div class="field-label row-label"><span>触发后区间</span><select id="windowUnit" class="unit-select"><option value="ms">ms</option><option value="s">s</option></select></div>
+          <div class="range-fields">
+            <label><span>起点</span><input id="windowStart" type="number" value="0" min="0" step="1"></label>
+            <span class="range-arrow">→</span>
+            <label><span>终点</span><input id="windowEnd" type="number" value="100" min="0" step="1"></label>
+          </div>
+          <p class="field-hint">区间定义为 (起点, 终点]，不包含触发样本。</p>
+        </fieldset>
+
+        <fieldset id="simulationOptions">
+          <legend>模拟设置</legend>
+          <label class="field-label" for="simulationPeriod">触发周期 / ms</label>
+          <input id="simulationPeriod" type="number" value="250" min="20" step="10">
+          <label class="check-row"><input id="simulationRealtime" type="checkbox" checked><span>按真实时间运行</span></label>
+        </fieldset>
+      </form>
+      <div id="runMessage" class="run-message">参数在采集期间自动锁定。</div>
+    </aside>
+
+    <section class="dashboard">
+      <div class="chart-toolbar">
+        <div>
+          <span class="eyebrow">LONG-TERM DRIFT</span>
+          <h2>通道平均值趋势</h2>
+        </div>
+        <div class="toolbar-controls">
+          <span id="drawInfo" class="draw-info">绘制 0 / 0 点</span>
+          <label>横轴<select id="xAxisMode"><option value="event">触发序号</option><option value="timestamp">触发时间</option><option value="runtime">运行时间</option></select></label>
+        </div>
+      </div>
+      <div class="charts-grid">
+        <article class="chart-card" data-channel="0">
+          <div class="chart-head"><div><span class="channel-tag c0">AI0</span><h3>平均电压</h3></div><div class="latest"><span>最新</span><strong data-stat="latest">—</strong></div></div>
+          <canvas id="chart0" aria-label="AI0 平均电压趋势图"></canvas>
+          <div class="chart-stats"><span>漂移 <b data-stat="drift">—</b></span><span>最小 <b data-stat="min">—</b></span><span>最大 <b data-stat="max">—</b></span></div>
+        </article>
+        <article class="chart-card" data-channel="1">
+          <div class="chart-head"><div><span class="channel-tag c1">AI1</span><h3>平均电压</h3></div><div class="latest"><span>最新</span><strong data-stat="latest">—</strong></div></div>
+          <canvas id="chart1" aria-label="AI1 平均电压趋势图"></canvas>
+          <div class="chart-stats"><span>漂移 <b data-stat="drift">—</b></span><span>最小 <b data-stat="min">—</b></span><span>最大 <b data-stat="max">—</b></span></div>
+        </article>
+        <article class="chart-card" data-channel="2">
+          <div class="chart-head"><div><span class="channel-tag c2">AI2</span><h3>平均电压</h3></div><div class="latest"><span>最新</span><strong data-stat="latest">—</strong></div></div>
+          <canvas id="chart2" aria-label="AI2 平均电压趋势图"></canvas>
+          <div class="chart-stats"><span>漂移 <b data-stat="drift">—</b></span><span>最小 <b data-stat="min">—</b></span><span>最大 <b data-stat="max">—</b></span></div>
+        </article>
+        <article class="chart-card" data-channel="3">
+          <div class="chart-head"><div><span class="channel-tag c3">AI3</span><h3>平均电压</h3></div><div class="latest"><span>最新</span><strong data-stat="latest">—</strong></div></div>
+          <canvas id="chart3" aria-label="AI3 平均电压趋势图"></canvas>
+          <div class="chart-stats"><span>漂移 <b data-stat="drift">—</b></span><span>最小 <b data-stat="min">—</b></span><span>最大 <b data-stat="max">—</b></span></div>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <div id="contextMenu" class="context-menu" role="menu" hidden>
+    <button data-action="channel" role="menuitem">保存当前通道 CSV</button>
+    <button data-action="all" role="menuitem">保存全部通道 CSV</button>
+    <hr>
+    <button data-action="reset" role="menuitem">重置缩放</button>
+  </div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>
+
